@@ -14,17 +14,28 @@
 <link rel="manifest" href="manifest.json">
 <style>
   :root{
+    --page-bg:linear-gradient(180deg,#0b1020,#0e1530 60%,#0b1020);
     --bg:#0b1020; --card:#161d33; --card2:#1e2745; --ink:#f2f5ff; --muted:#9aa6c7;
     --accent:#ffb43a; --accent2:#4fd0e0; --good:#37d399; --line:#2a3556;
+    --shadow:rgba(0,0,0,.35);
+  }
+  body.light{
+    --page-bg:linear-gradient(180deg,#eef2fb,#f6f8fd 60%,#eef2fb);
+    --bg:#f6f8fd; --card:#ffffff; --card2:#eef2fb; --ink:#182042; --muted:#5b6788;
+    --accent:#eaa22a; --accent2:#1595a6; --good:#1eac74; --line:#dde3f1;
+    --shadow:rgba(30,40,80,.14);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0; height:100%}
   body{
-    background:linear-gradient(180deg,#0b1020,#0e1530 60%,#0b1020);
+    background:var(--page-bg);
     color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     display:flex; flex-direction:column; min-height:100%;
+    transition:background .25s, color .25s;
   }
-  header{padding:14px 16px 8px; text-align:center}
+  header{padding:14px 16px 8px; text-align:center; position:relative}
+  .themebtn{position:absolute; top:10px; right:12px; width:38px; height:38px; border-radius:50%;
+    background:var(--card); border:1px solid var(--line); color:var(--ink); font-size:17px; line-height:1}
   header h1{margin:0; font-size:19px; letter-spacing:.3px}
   header .sub{color:var(--muted); font-size:12px; margin-top:2px}
   nav{display:flex; gap:6px; padding:8px 12px; justify-content:center; flex-wrap:wrap}
@@ -47,10 +58,12 @@
     display:flex; align-items:center; justify-content:center; text-align:center;
     padding:26px; border:1px solid var(--line); box-shadow:0 10px 30px rgba(0,0,0,.35);
   }
+  .face{box-shadow:0 10px 30px var(--shadow)}
   .front{background:linear-gradient(160deg,var(--card2),var(--card)); }
   .front .term{font-size:30px; font-weight:700; line-height:1.25}
   .front .hint{position:absolute; bottom:14px; left:0; right:0; color:var(--muted); font-size:12px}
   .back{background:linear-gradient(160deg,#132a2e,#14203a); transform:rotateY(180deg); flex-direction:column; gap:10px}
+  body.light .back{background:linear-gradient(160deg,#e9faf6,#eaf1ff)}
   .back .def{font-size:19px; line-height:1.45}
   .back .ex{color:var(--accent2); font-size:15px; line-height:1.4}
   .controls{display:flex; gap:10px; margin:16px auto 0; max-width:520px}
@@ -82,6 +95,7 @@
 </head>
 <body>
 <header>
+  <button id="theme" class="themebtn" aria-label="Toggle light/dark">🌙</button>
   <h1>🇵🇷 Mi Español Boricua</h1>
   <div class="sub" id="deckcount">0 cards</div>
 </header>
@@ -334,6 +348,20 @@ document.getElementById("copyJson").addEventListener("click", ()=>copy("jsonout"
 // ---- Toast ----
 let toastTimer;
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),1600); }
+
+// ---- Theme ----
+const TKEY="pr_theme";
+function applyTheme(t){
+  document.body.classList.toggle("light", t==="light");
+  document.getElementById("theme").textContent = t==="light" ? "☀️" : "🌙";
+  const mc=document.querySelector('meta[name="theme-color"]'); if(mc) mc.setAttribute("content", t==="light" ? "#eef2fb" : "#0b1020");
+  try{ localStorage.setItem(TKEY,t); }catch(e){}
+}
+let curTheme="dark"; try{ curTheme=localStorage.getItem(TKEY)||"dark"; }catch(e){}
+applyTheme(curTheme);
+document.getElementById("theme").addEventListener("click", ()=>{
+  applyTheme(document.body.classList.contains("light") ? "dark" : "light");
+});
 
 // ---- Go ----
 buildOrder(false);
