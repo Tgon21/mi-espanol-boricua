@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1020">
+<title>Mi Español Boricua — Flashcards</title>
+<style>
+  :root{
+    --bg:#0b1020; --card:#161d33; --card2:#1e2745; --ink:#f2f5ff; --muted:#9aa6c7;
+    --accent:#ffb43a; --accent2:#4fd0e0; --good:#37d399; --line:#2a3556;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; height:100%}
+  body{
+    background:linear-gradient(180deg,#0b1020,#0e1530 60%,#0b1020);
+    color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; min-height:100%;
+  }
+  header{padding:14px 16px 8px; text-align:center}
+  header h1{margin:0; font-size:19px; letter-spacing:.3px}
+  header .sub{color:var(--muted); font-size:12px; margin-top:2px}
+  nav{display:flex; gap:6px; padding:8px 12px; justify-content:center; flex-wrap:wrap}
+  nav button{
+    background:var(--card); color:var(--ink); border:1px solid var(--line);
+    padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600;
+  }
+  nav button.active{background:var(--accent); color:#231a05; border-color:var(--accent)}
+  main{flex:1; padding:10px 16px 30px; max-width:640px; margin:0 auto; width:100%}
+  .view{display:none}
+  .view.active{display:block}
+
+  /* Study */
+  .counter{text-align:center; color:var(--muted); font-size:13px; margin:6px 0 12px}
+  .flip{perspective:1400px; height:340px; margin:0 auto; max-width:520px}
+  .flip-inner{position:relative; width:100%; height:100%; transition:transform .5s; transform-style:preserve-3d; cursor:pointer}
+  .flip.flipped .flip-inner{transform:rotateY(180deg)}
+  .face{
+    position:absolute; inset:0; backface-visibility:hidden; border-radius:22px;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    padding:26px; border:1px solid var(--line); box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .front{background:linear-gradient(160deg,var(--card2),var(--card)); }
+  .front .term{font-size:30px; font-weight:700; line-height:1.25}
+  .front .hint{position:absolute; bottom:14px; left:0; right:0; color:var(--muted); font-size:12px}
+  .back{background:linear-gradient(160deg,#132a2e,#14203a); transform:rotateY(180deg); flex-direction:column; gap:10px}
+  .back .def{font-size:19px; line-height:1.45}
+  .back .ex{color:var(--accent2); font-size:15px; line-height:1.4}
+  .controls{display:flex; gap:10px; margin:16px auto 0; max-width:520px}
+  .controls button{flex:1; padding:14px; border-radius:14px; border:1px solid var(--line);
+    background:var(--card); color:var(--ink); font-size:15px; font-weight:600}
+  .controls button.primary{background:var(--accent); color:#231a05; border-color:var(--accent)}
+  .toolbar{display:flex; gap:8px; justify-content:center; margin-top:12px}
+  .toolbar button{background:transparent; color:var(--muted); border:1px solid var(--line); padding:8px 12px; border-radius:10px; font-size:12px}
+
+  /* Browse */
+  .search{width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:15px; margin-bottom:10px}
+  .row{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:8px}
+  .row .t{font-weight:700; font-size:16px}
+  .row .d{color:var(--muted); font-size:14px; margin-top:3px}
+  .row .del{float:right; color:#ff8a8a; background:transparent; border:none; font-size:13px}
+
+  /* Add / Export */
+  textarea{width:100%; min-height:150px; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
+    background:var(--card); color:var(--ink); font-size:14px; font-family:ui-monospace,Menlo,Consolas,monospace; line-height:1.5}
+  .btn{display:block; width:100%; padding:14px; border-radius:14px; border:none; font-size:16px; font-weight:700; margin-top:10px}
+  .btn.go{background:var(--good); color:#04231a}
+  .btn.alt{background:var(--accent2); color:#062227}
+  .note{color:var(--muted); font-size:13px; line-height:1.5; margin:8px 2px}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--good); color:#04231a;
+    padding:12px 18px; border-radius:12px; font-weight:700; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast.show{opacity:1}
+  h3{margin:18px 2px 6px; font-size:15px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🇵🇷 Mi Español Boricua</h1>
+  <div class="sub" id="deckcount">0 cards</div>
+</header>
+<nav>
+  <button data-view="study" class="active">Study</button>
+  <button data-view="browse">Browse</button>
+  <button data-view="add">Add</button>
+  <button data-view="export">Export</button>
+</nav>
+<main>
+  <!-- STUDY -->
+  <section id="study" class="view active">
+    <div class="counter" id="counter">–</div>
+    <div class="flip" id="flip">
+      <div class="flip-inner">
+        <div class="face front"><div class="term" id="term">–</div><div class="hint">tap to flip</div></div>
+        <div class="face back"><div class="def" id="def"></div><div class="ex" id="ex"></div></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="prev">‹ Prev</button>
+      <button id="flipBtn" class="primary">Flip</button>
+      <button id="next">Next ›</button>
+    </div>
+    <div class="toolbar">
+      <button id="shuffle">🔀 Shuffle</button>
+      <button id="reset">↺ In order</button>
+    </div>
+  </section>
+
+  <!-- BROWSE -->
+  <section id="browse" class="view">
+    <input class="search" id="search" placeholder="Search words…">
+    <div id="list"></div>
+  </section>
+
+  <!-- ADD -->
+  <section id="add" class="view">
+    <div class="note">Paste a block Claude gave you (one card per line: <b>word</b>, then a tab, then the meaning). It merges into your deck and saves on this phone. Duplicates are skipped.</div>
+    <textarea id="addbox" placeholder="guagua&#9;Bus. Ej: &quot;Cogí la guagua.&quot; — I took the bus."></textarea>
+    <button class="btn go" id="addBtn">➕ Add these cards</button>
+    <div class="note" id="addresult"></div>
+  </section>
+
+  <!-- EXPORT -->
+  <section id="export" class="view">
+    <h3>Quizlet import (Tab / New line)</h3>
+    <div class="note">Copy this and paste into Quizlet → Create → Import when you're at a computer.</div>
+    <textarea id="quizout" readonly></textarea>
+    <button class="btn alt" id="copyQuiz">📋 Copy Quizlet text</button>
+    <h3>Full backup (send to Claude to rebuild)</h3>
+    <textarea id="jsonout" readonly style="min-height:110px"></textarea>
+    <button class="btn alt" id="copyJson">📋 Copy backup</button>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---- Seed deck (your cards so far). def uses "text ||| example" so we can style the example. ----
+const SEED = [
+  ["¿Puedo usar...?", "Can I use...?", "¿Puedo usar la compu aquí? — Can I use the computer here?"],
+  ["la compu", "The computer (casual, short for computadora).", "Préstame la compu un momento. — Lend me the computer for a second."],
+  ["aquí", "Here.", "Ven acá, siéntate aquí. — Come here, sit here."],
+  ["pa'", "Casual shortening of 'para' (for / to).", "Esto es pa' ti. — This is for you."],
+  ["meterme a Quizlet", "To get on / go into Quizlet (more natural than 'conectarme a').", "Déjame meterme a Quizlet. — Let me get on Quizlet."],
+  ["pasar (a flashcards)", "To move / transfer something into cards.", "Voy a pasar las palabras a flashcards. — I'm going to move the words into flashcards."],
+  ["todas las palabras y frases que aprendo", "All the words and phrases I learn.", "Guardo todas las palabras y frases que aprendo. — I save all the words and phrases I learn."],
+  ["mete mano", "Go ahead / dig in / get to it (PR slang).", "Sí, mete mano. — Yeah, go ahead."],
+  ["duro", "Awesome / great (PR slang).", "Duro, gracias. — Awesome, thanks."],
+  ["dale", "Go for it / okay / sure.", "Sí, dale. — Yeah, go for it."],
+  ["mira", "Hey / look (to get someone's attention).", "Mira, ven acá un momentito. — Hey, come here for a sec."],
+  ["un momentito", "Just a moment / a quick sec.", "Espérame un momentito. — Wait for me just a moment."],
+  ["¿Puedo usar la compu aquí pa' meterme a Quizlet y pasar todas las palabras y frases que aprendo a flashcards?", "Can I use the computer here to get on Quizlet and move all the words and phrases I learn into flashcards? (full local phrasing)", ""],
+  ["guagua", "Bus.", "Cogí la guagua pa'l trabajo. — I took the bus to work."],
+  ["chavos", "Money.", "No tengo chavos pa' salir hoy. — I don't have money to go out today."],
+  ["bregar", "To deal with / handle something.", "Tengo que bregar con esto ahora. — I have to deal with this now."],
+  ["zafacón", "Trash can.", "Tira eso en el zafacón. — Throw that in the trash can."],
+  ["pana", "Buddy / close friend.", "Ese es mi pana del alma. — That's my best buddy."],
+  ["chévere", "Cool / great.", "El party estuvo bien chévere. — The party was really cool."],
+  ["revolú", "A mess / chaos.", "Qué revolú hay en la cocina. — What a mess there is in the kitchen."],
+  ["al garete", "Aimless / out of control.", "Todo está al garete hoy. — Everything is out of control today."],
+  ["janguear", "To hang out.", "Vamos a janguear esta noche. — Let's hang out tonight."]
+];
+
+const KEY = "pr_spanish_deck_v1";
+let deck = load();
+let order = [];
+let pos = 0;
+let flipped = false;
+
+function load(){
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
+  if(saved && Array.isArray(saved) && saved.length){ return saved; }
+  const seeded = SEED.map(s => ({term:s[0], def:s[1], ex:s[2]||""}));
+  save(seeded);
+  return seeded;
+}
+function save(d){
+  try { localStorage.setItem(KEY, JSON.stringify(d)); } catch(e){}
+}
+function keyOf(t){ return t.trim().toLowerCase(); }
+
+// ---- Study ----
+function buildOrder(shuffle){
+  order = deck.map((_,i)=>i);
+  if(shuffle){ for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; } }
+  pos = 0; flipped=false; render();
+}
+function render(){
+  document.getElementById("deckcount").textContent = deck.length + " cards";
+  if(!deck.length){ document.getElementById("term").textContent="No cards yet — add some!"; document.getElementById("counter").textContent="0 / 0"; return; }
+  const c = deck[order[pos]];
+  document.getElementById("counter").textContent = (pos+1)+" / "+order.length;
+  document.getElementById("term").textContent = c.term;
+  document.getElementById("def").textContent = c.def;
+  document.getElementById("ex").textContent = c.ex ? "Ej: "+c.ex : "";
+  const f = document.getElementById("flip");
+  flipped=false; f.classList.remove("flipped");
+}
+function doFlip(){ flipped=!flipped; document.getElementById("flip").classList.toggle("flipped", flipped); }
+function step(n){ if(!deck.length) return; pos=(pos+n+order.length)%order.length; render(); }
+
+document.getElementById("flip").addEventListener("click", doFlip);
+document.getElementById("flipBtn").addEventListener("click", doFlip);
+document.getElementById("next").addEventListener("click", ()=>step(1));
+document.getElementById("prev").addEventListener("click", ()=>step(-1));
+document.getElementById("shuffle").addEventListener("click", ()=>buildOrder(true));
+document.getElementById("reset").addEventListener("click", ()=>buildOrder(false));
+
+// ---- Nav ----
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    const v = b.dataset.view;
+    document.getElementById(v).classList.add("active");
+    if(v==="browse") renderList();
+    if(v==="export") renderExport();
+  });
+});
+
+// ---- Browse ----
+function renderList(filter){
+  const list = document.getElementById("list");
+  const q = (filter||"").trim().toLowerCase();
+  list.innerHTML="";
+  deck.forEach((c,i)=>{
+    if(q && !(c.term.toLowerCase().includes(q) || c.def.toLowerCase().includes(q))) return;
+    const div = document.createElement("div");
+    div.className="row";
+    div.innerHTML = '<button class="del" data-i="'+i+'">delete</button><div class="t"></div><div class="d"></div>';
+    div.querySelector(".t").textContent = c.term;
+    div.querySelector(".d").textContent = c.def + (c.ex? "  ·  "+c.ex : "");
+    list.appendChild(div);
+  });
+  list.querySelectorAll(".del").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const i=+btn.dataset.i; deck.splice(i,1); save(deck); renderList(document.getElementById("search").value); toast("Deleted");
+    });
+  });
+}
+document.getElementById("search").addEventListener("input", e=>renderList(e.target.value));
+
+// ---- Add (parse a pasted block) ----
+function parseBlock(text){
+  const out=[];
+  text.split(/\r?\n/).forEach(line=>{
+    if(!line.trim()) return;
+    let term, rest;
+    if(line.includes("\t")){ const p=line.split("\t"); term=p[0]; rest=p.slice(1).join(" ").trim(); }
+    else { // fallback: split on first " — " or first "  " if no tab
+      const m = line.split(/\s—\s|\s{2,}/); term=m[0]; rest=m.slice(1).join(" ").trim();
+    }
+    if(!term || !rest) return;
+    // pull example: look for "Ej:" or "Ex:" marker
+    let def=rest, ex="";
+    const em = rest.match(/E[jx]:\s*(.*)$/i);
+    if(em){ ex = em[1].trim(); def = rest.slice(0, em.index).trim().replace(/[.\s]*$/,'').trim(); if(!def) def=rest; }
+    out.push({term:term.trim(), def:def.trim(), ex:ex});
+  });
+  return out;
+}
+document.getElementById("addBtn").addEventListener("click", ()=>{
+  const txt = document.getElementById("addbox").value;
+  const parsed = parseBlock(txt);
+  if(!parsed.length){ document.getElementById("addresult").textContent="Couldn't read any cards — make sure each line has a word, a tab, then the meaning."; return; }
+  const existing = new Set(deck.map(c=>keyOf(c.term)));
+  let added=0, dupes=0;
+  parsed.forEach(c=>{ if(existing.has(keyOf(c.term))){ dupes++; } else { deck.push(c); existing.add(keyOf(c.term)); added++; } });
+  save(deck);
+  document.getElementById("addbox").value="";
+  document.getElementById("addresult").textContent = "Added "+added+" card"+(added===1?"":"s")+(dupes?(" · skipped "+dupes+" already in deck"):"")+". You now have "+deck.length+".";
+  buildOrder(false);
+  toast("Added "+added+" cards");
+});
+
+// ---- Export ----
+function renderExport(){
+  document.getElementById("quizout").value = deck.map(c=>{
+    let d=c.def;
+    if(c.ex){
+      const parts=c.ex.split(" — ");
+      const sent=parts[0].trim().replace(/^"|"$/g,"").trim();
+      const tr=(parts[1]||"").trim();
+      const close=/[.!?]$/.test(sent) ? '"' : '."';
+      d += ' Ej: "'+sent+close+(tr?" — "+tr:"");
+    }
+    return c.term+"\t"+d.replace(/\t/g," ");
+  }).join("\n");
+  document.getElementById("jsonout").value = JSON.stringify(deck);
+}
+function copy(id,label){
+  const el=document.getElementById(id); el.select(); el.setSelectionRange(0,999999);
+  try{ document.execCommand("copy"); }catch(e){}
+  if(navigator.clipboard){ navigator.clipboard.writeText(el.value).catch(()=>{}); }
+  toast(label+" copied");
+}
+document.getElementById("copyQuiz").addEventListener("click", ()=>copy("quizout","Quizlet text"));
+document.getElementById("copyJson").addEventListener("click", ()=>copy("jsonout","Backup"));
+
+// ---- Toast ----
+let toastTimer;
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),1600); }
+
+// ---- Go ----
+buildOrder(false);
+</script>
+</body>
+</html>
