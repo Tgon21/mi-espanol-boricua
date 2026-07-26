@@ -64,9 +64,14 @@
   .face{box-shadow:0 10px 30px var(--shadow)}
   .front{background:linear-gradient(160deg,var(--card2),var(--card)); }
   .front .term{font-size:30px; font-weight:700; line-height:1.25}
+  .front .term.small{font-size:20px; line-height:1.35}
   .front .hint{position:absolute; bottom:14px; left:0; right:0; color:var(--muted); font-size:12px}
-  .back{background:linear-gradient(160deg,#132a2e,#14203a); transform:rotateY(180deg); flex-direction:column; gap:10px}
+  .back{background:linear-gradient(160deg,#132a2e,#14203a); transform:rotateY(180deg); flex-direction:column; gap:12px}
   body.light .back{background:linear-gradient(160deg,#e9faf6,#eaf1ff)}
+  .exbtn{background:transparent; border:1px solid var(--line); color:var(--muted); padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600}
+  .back .ex{display:none}
+  .back.show .ex{display:block}
+  .back.show .exbtn{display:none}
   .back .def{font-size:19px; line-height:1.45}
   .back .ex{color:var(--accent2); font-size:15px; line-height:1.4}
   .controls{display:flex; gap:10px; margin:16px auto 0; max-width:520px}
@@ -77,11 +82,19 @@
   .toolbar button{background:transparent; color:var(--muted); border:1px solid var(--line); padding:8px 12px; border-radius:10px; font-size:12px}
 
   /* Browse */
-  .search{width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:15px; margin-bottom:10px}
+  .search{width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:15px}
+  .browsebar{display:flex; gap:8px; align-items:center; margin-bottom:10px}
+  .browsebar .search{flex:1}
+  .browsebar #revealToggle{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:12px 14px; font-size:13px; font-weight:700; white-space:nowrap}
   .row{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:8px}
   .row .tag{float:right; margin-right:8px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--accent2); border:1px solid var(--line); border-radius:6px; padding:1px 6px}
   .row .t{font-weight:700; font-size:16px}
-  .row .d{color:var(--muted); font-size:14px; margin-top:3px}
+  .row .d{color:var(--muted); font-size:14px; margin-top:4px; display:none}
+  .row.revealed .d{display:block}
+  .row .exlink{display:inline-block; margin-top:8px; font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:3px 9px; background:transparent}
+  .row .ex2{color:var(--accent2); font-size:13px; margin-top:6px; line-height:1.4; display:none}
+  .row.show-ex .ex2{display:block}
+  .row.show-ex .exlink{border-color:var(--accent2); color:var(--accent2)}
   .row .del{float:right; color:#ff8a8a; background:transparent; border:none; font-size:13px}
 
   /* Add / Export */
@@ -116,8 +129,12 @@
     <div class="counter" id="counter">–</div>
     <div class="flip" id="flip">
       <div class="flip-inner">
-        <div class="face front"><div class="term" id="term">–</div><div class="hint">tap to flip</div></div>
-        <div class="face back"><div class="def" id="def"></div><div class="ex" id="ex"></div></div>
+        <div class="face front"><div class="term" id="frontTxt">–</div><div class="hint">tap to flip</div></div>
+        <div class="face back" id="backFace">
+          <div class="def" id="backTxt"></div>
+          <button class="exbtn" id="exBtn">Show example</button>
+          <div class="ex" id="ex"></div>
+        </div>
       </div>
     </div>
     <div class="controls">
@@ -129,11 +146,18 @@
       <button id="shuffle">🔀 Shuffle</button>
       <button id="reset">↺ In order</button>
     </div>
+    <div class="toolbar">
+      <button id="dir">Front: Español</button>
+    </div>
   </section>
 
   <!-- BROWSE -->
   <section id="browse" class="view">
-    <input class="search" id="search" placeholder="Search words…">
+    <div class="browsebar">
+      <input class="search" id="search" placeholder="Search…">
+      <button id="revealToggle">Show all</button>
+    </div>
+    <div class="note" style="margin:0 2px 10px">Tap a card to reveal the English · tap "example" for the sentence.</div>
     <div id="list"></div>
   </section>
 
@@ -218,6 +242,8 @@ let order = [];
 let pos = 0;
 let flipped = false;
 let catFilter = "all";
+let showAll = false;
+let dirMode = "es"; try{ dirMode = localStorage.getItem("pr_dir") || "es"; }catch(e){}
 
 function load(){
   let saved = null;
@@ -268,20 +294,28 @@ function buildOrder(shuffle){
   if(shuffle){ for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; } }
   pos = 0; flipped=false; render();
 }
+const DIRLABEL={es:"Front: Español", en:"Front: English", mix:"Front: Mix"};
+function frontIsEnglish(i){ if(dirMode==="en") return true; if(dirMode==="es") return false; return (i%2)===1; }
 function render(){
   document.getElementById("deckcount").textContent = deck.length + " cards";
-  const f = document.getElementById("flip"); flipped=false; f.classList.remove("flipped");
+  const flip=document.getElementById("flip"); flipped=false; flip.classList.remove("flipped");
+  document.getElementById("backFace").classList.remove("show");
+  const ft=document.getElementById("frontTxt"), bt=document.getElementById("backTxt"), ex=document.getElementById("ex");
   if(!order.length){
-    document.getElementById("term").textContent = deck.length ? "No "+ (catFilter==="all"?"cards":CATLABEL[catFilter].toLowerCase()) +" here" : "No cards yet — add some!";
-    document.getElementById("counter").textContent = "0 / 0";
-    document.getElementById("def").textContent=""; document.getElementById("ex").textContent="";
+    ft.textContent = deck.length ? ("No "+(catFilter==="all"?"cards":CATLABEL[catFilter].toLowerCase())+" here") : "No cards yet — add some!";
+    ft.classList.remove("small");
+    document.getElementById("counter").textContent="0 / 0";
+    bt.textContent=""; ex.textContent=""; document.getElementById("exBtn").style.display="none";
     return;
   }
-  const c = deck[order[pos]];
-  document.getElementById("counter").textContent = (pos+1)+" / "+order.length;
-  document.getElementById("term").textContent = c.term;
-  document.getElementById("def").textContent = c.def;
-  document.getElementById("ex").textContent = c.ex ? "Ej: "+c.ex : "";
+  const idx=order[pos], c=deck[idx], fe=frontIsEnglish(idx);
+  const frontText = fe ? c.def : c.term;
+  const backText  = fe ? c.term : c.def;
+  ft.textContent=frontText; ft.classList.toggle("small", frontText.length>28);
+  bt.textContent=backText;
+  ex.textContent = c.ex ? "Ej: "+c.ex : "";
+  document.getElementById("exBtn").style.display = c.ex ? "" : "none";
+  document.getElementById("counter").textContent=(pos+1)+" / "+order.length;
 }
 function doFlip(){ flipped=!flipped; document.getElementById("flip").classList.toggle("flipped", flipped); }
 function step(n){ if(!deck.length) return; pos=(pos+n+order.length)%order.length; render(); }
@@ -292,6 +326,10 @@ document.getElementById("next").addEventListener("click", ()=>step(1));
 document.getElementById("prev").addEventListener("click", ()=>step(-1));
 document.getElementById("shuffle").addEventListener("click", ()=>buildOrder(true));
 document.getElementById("reset").addEventListener("click", ()=>buildOrder(false));
+document.getElementById("exBtn").addEventListener("click", (e)=>{ e.stopPropagation(); document.getElementById("backFace").classList.add("show"); });
+(function(){ const d=document.getElementById("dir"); d.textContent=DIRLABEL[dirMode];
+  d.addEventListener("click", ()=>{ dirMode = dirMode==="es"?"en":(dirMode==="en"?"mix":"es"); try{localStorage.setItem("pr_dir",dirMode);}catch(e){} d.textContent=DIRLABEL[dirMode]; buildOrder(false); });
+})();
 
 // ---- Nav ----
 document.querySelectorAll("nav button").forEach(b=>{
@@ -315,20 +353,33 @@ function renderList(filter){
     if(catFilter!=="all" && c.cat!==catFilter) return;
     if(q && !(c.term.toLowerCase().includes(q) || c.def.toLowerCase().includes(q))) return;
     const div = document.createElement("div");
-    div.className="row";
-    div.innerHTML = '<button class="del" data-i="'+i+'">delete</button><span class="tag"></span><div class="t"></div><div class="d"></div>';
-    div.querySelector(".tag").textContent = CATLABEL[c.cat] ? c.cat : "";
+    div.className = "row" + (showAll ? " revealed" : "");
+    div.innerHTML =
+      '<button class="del">delete</button>'+
+      '<span class="tag"></span>'+
+      '<div class="t"></div>'+
+      '<div class="d"></div>'+
+      (c.ex ? '<button class="exlink">example</button>' : '')+
+      '<div class="ex2"></div>';
+    div.querySelector(".tag").textContent = c.cat || "";
     div.querySelector(".t").textContent = c.term;
-    div.querySelector(".d").textContent = c.def + (c.ex? "  ·  "+c.ex : "");
-    list.appendChild(div);
-  });
-  list.querySelectorAll(".del").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const i=+btn.dataset.i; deck.splice(i,1); save(deck); renderFilters(); buildOrder(false); renderList(document.getElementById("search").value); toast("Deleted");
+    div.querySelector(".d").textContent = c.def;
+    if(c.ex) div.querySelector(".ex2").textContent = "Ej: "+c.ex;
+    div.addEventListener("click", ()=> div.classList.toggle("revealed"));
+    const exl=div.querySelector(".exlink");
+    if(exl) exl.addEventListener("click",(e)=>{ e.stopPropagation(); div.classList.toggle("show-ex"); });
+    div.querySelector(".del").addEventListener("click",(e)=>{
+      e.stopPropagation(); deck.splice(i,1); save(deck); renderFilters(); buildOrder(false); renderList(document.getElementById("search").value); toast("Deleted");
     });
+    list.appendChild(div);
   });
 }
 document.getElementById("search").addEventListener("input", e=>renderList(e.target.value));
+document.getElementById("revealToggle").addEventListener("click", ()=>{
+  showAll=!showAll;
+  document.getElementById("revealToggle").textContent = showAll ? "Hide all" : "Show all";
+  renderList(document.getElementById("search").value);
+});
 
 // ---- Add (parse a pasted block) ----
 function parseBlock(text){
