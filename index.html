@@ -44,6 +44,9 @@
     padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600;
   }
   nav button.active{background:var(--accent); color:#231a05; border-color:var(--accent)}
+  .filters{display:flex; gap:6px; justify-content:center; flex-wrap:wrap; padding:0 12px 8px}
+  .filters button{background:transparent; color:var(--muted); border:1px solid var(--line); padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600}
+  .filters button.on{background:var(--accent2); color:#03232a; border-color:var(--accent2)}
   main{flex:1; padding:10px 16px 30px; max-width:640px; margin:0 auto; width:100%}
   .view{display:none}
   .view.active{display:block}
@@ -76,6 +79,7 @@
   /* Browse */
   .search{width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:15px; margin-bottom:10px}
   .row{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:8px}
+  .row .tag{float:right; margin-right:8px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--accent2); border:1px solid var(--line); border-radius:6px; padding:1px 6px}
   .row .t{font-weight:700; font-size:16px}
   .row .d{color:var(--muted); font-size:14px; margin-top:3px}
   .row .del{float:right; color:#ff8a8a; background:transparent; border:none; font-size:13px}
@@ -105,6 +109,7 @@
   <button data-view="add">Add</button>
   <button data-view="export">Export</button>
 </nav>
+<div class="filters" id="filters"></div>
 <main>
   <!-- STUDY -->
   <section id="study" class="view active">
@@ -212,6 +217,7 @@ let deck = load();
 let order = [];
 let pos = 0;
 let flipped = false;
+let catFilter = "all";
 
 function load(){
   let saved = null;
@@ -226,22 +232,56 @@ function save(d){
 }
 function keyOf(t){ return t.trim().toLowerCase(); }
 
+// ---- Categories: word / phrase / sentence ----
+const CATLABEL={all:"All", word:"Words", phrase:"Phrases", sentence:"Sentences"};
+function categorize(term){
+  const t=term.trim();
+  const endsSentence = /[.!?]$/.test(t) || /^[¿¡]/.test(t);
+  const core=t.replace(/\([^)]*\)/g,"").trim();          // drop parentheticals
+  const wordsAll=core.split(/\s+/).filter(Boolean);
+  let toks=wordsAll.slice();
+  if(toks.length>1 && /^(el|la|los|las|un|una)$/i.test(toks[0])) toks=toks.slice(1); // ignore a leading article
+  if(endsSentence && wordsAll.length>=3) return "sentence";
+  if(toks.length<=1) return "word";
+  return "phrase";
+}
+function ensureCats(d){ d.forEach(c=>{ if(!c.cat) c.cat=categorize(c.term); }); }
+function renderFilters(){
+  const counts={all:deck.length, word:0, phrase:0, sentence:0};
+  deck.forEach(c=>{ counts[c.cat]=(counts[c.cat]||0)+1; });
+  const f=document.getElementById("filters"); f.innerHTML="";
+  ["all","word","phrase","sentence"].forEach(k=>{
+    const b=document.createElement("button");
+    b.textContent=CATLABEL[k]+" "+(counts[k]||0);
+    if(k===catFilter) b.classList.add("on");
+    b.addEventListener("click",()=>{
+      catFilter=k; renderFilters(); buildOrder(false);
+      if(document.getElementById("browse").classList.contains("active")) renderList(document.getElementById("search").value);
+    });
+    f.appendChild(b);
+  });
+}
+
 // ---- Study ----
 function buildOrder(shuffle){
-  order = deck.map((_,i)=>i);
+  order = deck.map((_,i)=>i).filter(i => catFilter==="all" || deck[i].cat===catFilter);
   if(shuffle){ for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; } }
   pos = 0; flipped=false; render();
 }
 function render(){
   document.getElementById("deckcount").textContent = deck.length + " cards";
-  if(!deck.length){ document.getElementById("term").textContent="No cards yet — add some!"; document.getElementById("counter").textContent="0 / 0"; return; }
+  const f = document.getElementById("flip"); flipped=false; f.classList.remove("flipped");
+  if(!order.length){
+    document.getElementById("term").textContent = deck.length ? "No "+ (catFilter==="all"?"cards":CATLABEL[catFilter].toLowerCase()) +" here" : "No cards yet — add some!";
+    document.getElementById("counter").textContent = "0 / 0";
+    document.getElementById("def").textContent=""; document.getElementById("ex").textContent="";
+    return;
+  }
   const c = deck[order[pos]];
   document.getElementById("counter").textContent = (pos+1)+" / "+order.length;
   document.getElementById("term").textContent = c.term;
   document.getElementById("def").textContent = c.def;
   document.getElementById("ex").textContent = c.ex ? "Ej: "+c.ex : "";
-  const f = document.getElementById("flip");
-  flipped=false; f.classList.remove("flipped");
 }
 function doFlip(){ flipped=!flipped; document.getElementById("flip").classList.toggle("flipped", flipped); }
 function step(n){ if(!deck.length) return; pos=(pos+n+order.length)%order.length; render(); }
@@ -272,17 +312,19 @@ function renderList(filter){
   const q = (filter||"").trim().toLowerCase();
   list.innerHTML="";
   deck.forEach((c,i)=>{
+    if(catFilter!=="all" && c.cat!==catFilter) return;
     if(q && !(c.term.toLowerCase().includes(q) || c.def.toLowerCase().includes(q))) return;
     const div = document.createElement("div");
     div.className="row";
-    div.innerHTML = '<button class="del" data-i="'+i+'">delete</button><div class="t"></div><div class="d"></div>';
+    div.innerHTML = '<button class="del" data-i="'+i+'">delete</button><span class="tag"></span><div class="t"></div><div class="d"></div>';
+    div.querySelector(".tag").textContent = CATLABEL[c.cat] ? c.cat : "";
     div.querySelector(".t").textContent = c.term;
     div.querySelector(".d").textContent = c.def + (c.ex? "  ·  "+c.ex : "");
     list.appendChild(div);
   });
   list.querySelectorAll(".del").forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      const i=+btn.dataset.i; deck.splice(i,1); save(deck); renderList(document.getElementById("search").value); toast("Deleted");
+      const i=+btn.dataset.i; deck.splice(i,1); save(deck); renderFilters(); buildOrder(false); renderList(document.getElementById("search").value); toast("Deleted");
     });
   });
 }
@@ -314,9 +356,11 @@ document.getElementById("addBtn").addEventListener("click", ()=>{
   const existing = new Set(deck.map(c=>keyOf(c.term)));
   let added=0, dupes=0;
   parsed.forEach(c=>{ if(existing.has(keyOf(c.term))){ dupes++; } else { deck.push(c); existing.add(keyOf(c.term)); added++; } });
+  ensureCats(deck);
   save(deck);
   document.getElementById("addbox").value="";
   document.getElementById("addresult").textContent = "Added "+added+" card"+(added===1?"":"s")+(dupes?(" · skipped "+dupes+" already in deck"):"")+". You now have "+deck.length+".";
+  renderFilters();
   buildOrder(false);
   toast("Added "+added+" cards");
 });
@@ -364,6 +408,8 @@ document.getElementById("theme").addEventListener("click", ()=>{
 });
 
 // ---- Go ----
+ensureCats(deck);
+renderFilters();
 buildOrder(false);
 </script>
 </body>
